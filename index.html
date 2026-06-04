@@ -1082,9 +1082,8 @@ function render() {
         bar.style.top    = top + 'px';
         bar.style.height = BAR_H + 'px';
 
-        // Show label only on the very first segment of the first week
-        const isFirstSeg = si === 0 && segStart === (ev.start < weekStart ? weekStart : ev.start) && weekStart <= ev.start || (si === 0 && ev.start >= weekStart && segStart === ev.start);
-        bar.textContent = (segStart === ev.start && si === 0) ? ev.name : '';
+        // Show label on the first segment of every week this event appears in
+        bar.textContent = si === 0 ? ev.name : '';
 
         bar.addEventListener('mouseenter', e => showTooltip(e, ev));
         bar.addEventListener('mousemove', moveTooltip);
