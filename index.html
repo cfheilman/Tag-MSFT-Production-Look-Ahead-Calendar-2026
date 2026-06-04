@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Production Look Ahead Calendar 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --purple: #7B2FBE;
+    --purple2: #B39DDB;
+    --green: #2E7D32;
+    --blue: rgba(21, 101, 192, 0.35);
+    --blue-text: #1565C0;
+    --blue2: #1565C0;
+    --charcoal: #3a3835;
+    --orange: #E65100;
+    --bg: #f4f3f0;
+    --surface: #ffffff;
+    --border: #e2e0db;
+    --border-strong: #c8c5be;
+    --text: #1a1916;
+    --text-muted: #7a7872;
+    --text-faint: #b5b2aa;
+    --header-bg: #1e1d1b;
+    --today-ring: #f59e0b;
+    --weekend: #f9f8f6;
+    --other-month: #edecea;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --bar-h: 18px;
+    --bar-gap: 2px;
+    --day-num-h: 20px;
+    --cell-pad: 2px;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .app-header {
+    background: var(--header-bg);
+    padding: 10px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    border-bottom: 1px solid #2a2927;
+  }
+  .app-title { font-size: 14px; font-weight: 500; color: #fff; font-family: 'DM Mono', monospace; }
+  .app-title span { color: #555; margin: 0 8px; }
+  .legend { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #aaa; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+  .nav-controls { display: flex; align-items: center; gap: 8px; }
+  .nav-btn {
+    background: #2a2927; border: 1px solid #444; color: #ccc;
+    width: 28px; height: 28px; border-radius: 4px; cursor: pointer;
+    font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background 0.15s;
+  }
+  .nav-btn:hover { background: #3a3937; color: #fff; }
+  .month-label { font-size: 13px; font-weight: 500; color: #fff; min-width: 130px; text-align: center; font-family: 'DM Mono', monospace; }
+
+  .calendar-wrap { padding: 10px 14px; max-width: 1200px; margin: 0 auto; }
+  .calendar { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+
+  .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--header-bg); }
+  .cal-header-cell {
+    padding: 5px 0; text-align: center; font-size: 9px; font-weight: 500;
+    color: #777; letter-spacing: 0.1em; text-transform: uppercase;
+    border-right: 1px solid #252422;
+  }
+  .cal-header-cell:last-child { border-right: none; }
+
+  /* The grid of weeks — each week is a row */
+  .cal-weeks { }
+
+  .week-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    position: relative; /* bars are absolutely positioned inside here */
+    border-bottom: 1px solid var(--border);
+  }
+  .week-row:last-child { border-bottom: none; }
+
+  .day-cell {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    height: 130px;
+    min-height: 130px;
+    max-height: 130px;
+    overflow: hidden;
+  }
+  .day-cell:last-child { border-right: none; }
+  .day-cell.weekend { background: var(--weekend); }
+  .day-cell.other-month { background: var(--other-month); }
+  .day-cell.today { background: #fffbf0; }
+
+  .day-num {
+    font-size: 11px; font-weight: 500; color: var(--text-muted);
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 2px 0 0 3px;
+    line-height: 1;
+    position: relative; z-index: 2;
+  }
+  .day-cell.today .day-num {
+    background: var(--today-ring); color: #fff;
+    border-radius: 50%; font-weight: 600;
+  }
+  .day-cell.other-month .day-num { color: var(--text-faint); }
+
+  /* Bar layer — sits on top of the week row, absolutely positioned */
+  .bars-layer {
+    position: absolute;
+    top: var(--day-num-h); /* below day numbers */
+    left: 0; right: 0;
+    pointer-events: none;
+  }
+
+  .event-bar {
+    position: absolute;
+    height: var(--bar-h);
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 6px;
+    display: flex; align-items: center;
+    cursor: pointer;
+    pointer-events: all;
+    transition: opacity 0.15s, filter 0.15s;
+    z-index: 3;
+    user-select: none;
+  }
+  .event-bar:hover { opacity: 0.88; filter: brightness(1.08); }
+  .event-bar.purple  { background: var(--purple); }
+  .event-bar.purple2 { background: var(--purple2); color: #3a1a6e; }
+  .event-bar.green  { background: var(--green); }
+  .event-bar.blue     { background: var(--blue); color: #1a4a8a; border: 1.5px dashed #1565C0; }
+  .event-bar.blue2    { background: var(--blue2); color: #fff; }
+  .event-bar.charcoal { background: var(--charcoal); color: #e8e6e3; }
+  .event-bar.orange   { background: var(--orange); color: #fff; }
+
+  /* Drag ghost */
+  .event-bar.dragging { opacity: 0.4; }
+
+  .day-cell.past { background: #f0efed; }
+  .day-cell.past.weekend { background: #eceae8; }
+  .day-cell.past .day-num { color: #ccc; }
+  .event-bar.past-event { opacity: 0.45; }
+
+  .delete-confirm {
+    position: fixed; background: #1e1d1b; color: #fff;
+    border-radius: 8px; padding: 12px 16px; z-index: 9999;
+    font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    display: none;
+  }
+  .delete-confirm.visible { display: block; }
+  .delete-confirm p { margin-bottom: 10px; font-weight: 500; }
+  .delete-confirm-btns { display: flex; gap: 8px; }
+  .dc-btn { padding: 5px 12px; border-radius: 4px; border: none; font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .dc-yes { background: #dc2626; color: #fff; }
+  .dc-no  { background: #3a3835; color: #ccc; }
+
+  /* Tooltip */
+  .tooltip {
+    display: none; position: fixed;
+    background: #1e1d1b; color: #fff;
+    padding: 8px 12px; border-radius: 6px; font-size: 12px;
+    max-width: 260px; z-index: 9999; pointer-events: none; line-height: 1.5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .tooltip.visible { display: block; }
+  .tt-label { font-weight: 600; margin-bottom: 2px; }
+  .tt-date { color: #aaa; font-size: 11px; }
+  .tt-hint { color: #555; font-size: 10px; margin-top: 4px; border-top: 1px solid #333; padding-top: 4px; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 10px; padding: 24px; width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: 500; }
+  .modal-field input, .modal-field select {
+    width: 100%; border: 1px solid var(--border-strong); border-radius: 6px;
+    padding: 8px 10px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+    outline: none; background: var(--bg); color: var(--text);
+  }
+  .modal-field textarea {
+    width: 100%; border: 1px solid var(--border-strong); border-radius: 6px;
+    padding: 8px 10px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+    outline: none; background: var(--bg); color: var(--text);
+    resize: vertical; min-height: 70px; line-height: 1.5;
+  }
+  .modal-field textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(123,47,190,0.1); }
+
+  .job-picker {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
+  }
+  .job-swatch {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 20px; cursor: pointer;
+    font-size: 12px; font-weight: 500; border: 2px solid transparent;
+    transition: border-color 0.15s, opacity 0.15s; white-space: nowrap;
+    color: #fff;
+  }
+  .job-swatch:hover { opacity: 0.85; }
+  .job-swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px #888; }
+  .new-job-row {
+    display: flex; gap: 6px; align-items: center; margin-top: 4px;
+  }
+  .checkbox-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text); cursor: pointer;
+    padding: 6px 0;
+  }
+  .checkbox-row input[type=checkbox] {
+    width: 15px; height: 15px; cursor: pointer; accent-color: var(--purple);
+  }
+  .tt-notes { color: #ccc; font-size: 11px; margin-top: 3px; font-style: italic; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--purple); color: #fff; }
+  .btn-danger  { background: #dc2626; color: #fff; }
+  .btn-secondary { background: var(--border); color: var(--text); }
+
+  .reset-btn {
+    background: none; border: 1px solid #444; color: #888;
+    padding: 4px 10px; border-radius: 4px; font-size: 11px;
+    cursor: pointer; font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+  .reset-btn:hover { border-color: #dc2626; color: #dc2626; }
+  .io-btn {
+    background: none; border: 1px solid #444; color: #aaa;
+    padding: 4px 10px; border-radius: 4px; font-size: 11px;
+    cursor: pointer; font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+  .io-btn:hover { border-color: #888; color: #fff; }
+  .add-btn {
+    position: fixed; bottom: 28px; right: 32px;
+    width: 46px; height: 46px; background: var(--purple); color: #fff;
+    border: none; border-radius: 50%; font-size: 22px; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(123,47,190,0.4);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .add-btn:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(123,47,190,0.5); }
+
+  .tag-logo {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tag-wordmark {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
+    color: #fff; font-family: 'DM Sans', sans-serif;
+    line-height: 1;
+  }
+  .tag-wordmark span { color: #f59e0b; }
+  .tag-divider {
+    width: 1px; height: 28px; background: #333; margin: 0 4px;
+  }
+  .tag-subtitle {
+    font-size: 12px; color: #888; font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em; line-height: 1.3;
+  }
+  .tag-subtitle strong { display: block; color: #ccc; font-size: 13px; letter-spacing: 0; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+
+  .top-bar {
+    background: var(--header-bg);
+    padding: 10px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #2a2927;
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .legend-bar {
+    background: #171614;
+    padding: 7px 24px;
+    display: flex; align-items: center; gap: 20px;
+    border-bottom: 1px solid #222;
+    flex-wrap: wrap;
+  }
+  .legend-bar-label {
+    font-size: 10px; font-weight: 600; color: #555;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: 'DM Mono', monospace; margin-right: 4px;
+  }
+  .filter-item {
+    cursor: pointer; border-radius: 4px; padding: 2px 6px;
+    transition: background 0.15s, opacity 0.15s;
+    border: 1px solid transparent;
+  }
+  .filter-item:hover { background: rgba(255,255,255,0.08); }
+  .filter-item.active {
+    border-color: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+  }
+  .filter-item.dimmed { opacity: 0.3; }
+  .lock-btn {
+    background: none; border: 1px solid #444; color: #888;
+    padding: 3px 10px; border-radius: 4px; font-size: 11px;
+    cursor: pointer; font-family: 'DM Mono', monospace;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .lock-btn.unlocked { border-color: #4a9; color: #4a9; }
+  .lock-btn:hover { border-color: #aaa; color: #fff; }
+  body.view-only .add-btn { display: none; }
+  body.view-only .event-bar { cursor: default; pointer-events: none; }
+  body.view-only .note-delete { display: none; }
+  body.view-only [id="export-btn"] { display: none; }
+  .view-only-banner {
+    display: none; background: #1a1a1a; color: #888;
+    text-align: center; font-size: 11px; padding: 4px;
+    font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
+  }
+  body.view-only .view-only-banner { display: block; }
+
+  .notes-section {
+    max-width: 1200px; margin: 0 auto 40px;
+    padding: 0 14px;
+  }
+  .notes-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 8px;
+  }
+  .notes-title {
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+  .notes-saved { font-size: 10px; color: #4a9; font-family: 'DM Mono', monospace; }
+  .notes-input-row {
+    display: flex; gap: 8px; margin-bottom: 10px;
+  }
+  #notes-input {
+    flex: 1; border: 1px solid var(--border-strong); border-radius: 6px;
+    padding: 8px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+    background: var(--surface); color: var(--text); outline: none;
+  }
+  #notes-input:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(123,47,190,0.08); }
+  .notes-list {
+    list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .notes-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px;
+    font-size: 13px; line-height: 1.5; color: var(--text);
+  }
+  .notes-list li::before {
+    content: '–'; color: var(--purple); font-weight: 700;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .note-text { flex: 1; }
+  .note-delete {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-faint); font-size: 14px; line-height: 1;
+    padding: 0 2px; flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .note-delete:hover { color: #dc2626; }
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <div class="tag-logo">
+    <!-- TAG logo - actual brand image -->
+    <img src="data:image/png;base64,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" width="40" height="40" style="border-radius:5px;display:block;" alt="TAG logo"/>
+    <!-- Microsoft logo -->
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2"  y="2"  width="17" height="17" fill="#F25022"/>
+      <rect x="21" y="2"  width="17" height="17" fill="#7FBA00"/>
+      <rect x="2"  y="21" width="17" height="17" fill="#00A4EF"/>
+      <rect x="21" y="21" width="17" height="17" fill="#FFB900"/>
+    </svg>
+    <div class="tag-divider"></div>
+    <div>
+      <div class="tag-subtitle"><strong>Production Look Ahead Calendar</strong>2026</div>
+    </div>
+  </div>
+
+  <div class="nav-controls">
+    <button class="nav-btn" id="prev-btn">&#8592;</button>
+    <div class="month-label" id="month-label"></div>
+    <button class="nav-btn" id="next-btn">&#8594;</button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span id="save-indicator" style="font-size:10px;color:#555;font-family:'DM Mono',monospace;"></span>
+    <button class="io-btn" id="export-btn" title="Export events to JSON file">export</button>
+    
+  </div>
+</header>
+
+<div class="legend-bar">
+  <span class="legend-bar-label">Jobs Key</span>
+  <div class="legend-item filter-item" data-color="purple"><div class="legend-dot" style="background:#7B2FBE"></div>Intel Neo</div>
+  <div class="legend-item filter-item" data-color="purple2"><div class="legend-dot" style="background:#B39DDB"></div>Silicone Edit</div>
+  <div class="legend-item filter-item" data-color="green"><div class="legend-dot" style="background:#2E7D32"></div>Windows Holiday</div>
+  <div class="legend-item filter-item" data-color="blue2"><div class="legend-dot" style="background:#1565C0"></div>M365 (confirmed)</div>
+  <div class="legend-item filter-item" data-color="blue"><div class="legend-dot" style="background:rgba(21,101,192,0.35);border:1.5px dashed #1565C0"></div>M365 (pending)</div>
+  <div class="legend-item filter-item" data-color="charcoal"><div class="legend-dot" style="background:#3a3835"></div>OOO</div>
+  <div class="legend-item filter-item" data-color="orange"><div class="legend-dot" style="background:#E65100"></div>Lucid Link</div>
+  <div style="margin-left:auto;">
+    <button class="lock-btn" id="lock-btn" title="View only mode">🔒 Locked</button>
+  </div>
+</div>
+
+<div class="view-only-banner">View only — contact the calendar owner to make changes</div>
+
+<div class="calendar-wrap">
+  <div class="calendar">
+    <div class="cal-header">
+      <div class="cal-header-cell">Sun</div>
+      <div class="cal-header-cell">Mon</div>
+      <div class="cal-header-cell">Tue</div>
+      <div class="cal-header-cell">Wed</div>
+      <div class="cal-header-cell">Thu</div>
+      <div class="cal-header-cell">Fri</div>
+      <div class="cal-header-cell">Sat</div>
+    </div>
+    <div class="cal-weeks" id="cal-weeks"></div>
+  </div>
+</div>
+
+<div class="notes-section">
+  <div class="notes-header">
+    <span class="notes-title" id="notes-title">Notes</span>
+    <span class="notes-saved" id="notes-saved"></span>
+  </div>
+  <div class="notes-input-row">
+    <input type="text" id="notes-input" placeholder="Type a note and press Enter..." />
+  </div>
+  <ul class="notes-list" id="notes-list"></ul>
+</div>
+
+<button class="add-btn" id="add-btn" title="Add event">+</button>
+
+<div class="tooltip" id="tooltip">
+  <div class="tt-label" id="tt-label"></div>
+  <div class="tt-date" id="tt-date"></div>
+  <div class="tt-notes" id="tt-notes"></div>
+  <div class="tt-hint">Click to edit · Drag to move</div>
+</div>
+
+<div class="delete-confirm" id="delete-confirm">
+  <p id="dc-name"></p>
+  <div class="delete-confirm-btns">
+    <button class="dc-btn dc-yes" id="dc-yes">Delete</button>
+    <button class="dc-btn dc-no"  id="dc-no">Cancel</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Edit event</h3>
+    <div class="modal-field"><label>Event name</label><input type="text" id="ev-name" /></div>
+    <div class="modal-field"><label>Start date</label><input type="date" id="ev-start" /></div>
+    <div class="modal-field"><label>End date</label><input type="date" id="ev-end" /></div>
+    <div class="modal-field">
+      <label>Project / Job</label>
+      <div class="job-picker" id="job-picker"></div>
+      <div class="new-job-row" id="new-job-row">
+        <input type="text" id="new-job-name" placeholder="New job name..." style="flex:1;min-width:0;" />
+        <input type="color" id="new-job-color" value="#E91E8C" title="Pick color" style="width:36px;height:36px;border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;padding:2px;" />
+        <button type="button" class="btn btn-secondary" id="new-job-add-btn" style="padding:6px 12px;font-size:12px;">Add</button>
+      </div>
+      <input type="hidden" id="ev-color" />
+    </div>
+    <div class="modal-field">
+      <label>Notes</label>
+      <textarea id="ev-notes" placeholder="Add any notes about this job..."></textarea>
+    </div>
+    <div class="modal-field">
+      <label class="checkbox-row">
+        <input type="checkbox" id="ev-weekdays-only" />
+        Weekdays only (skip Sat &amp; Sun)
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn btn-danger" id="modal-delete" style="display:none">Delete</button>
+      <button class="btn btn-primary" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MON_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let currentMonth = 5;
+let currentYear  = 2026;
+let notesList    = [];
+let editingId    = null;
+let nextId       = 46;
+
+const DEFAULT_EVENTS = [
+  {
+    "id": 1,
+    "name": "Intel Neo – Creative Development",
+    "start": "2026-06-04",
+    "end": "2026-06-05",
+    "color": "purple"
+  },
+  {
+    "id": 2,
+    "name": "Intel Neo – Creative Development",
+    "start": "2026-06-08",
+    "end": "2026-06-16",
+    "color": "purple",
+    "notes": "",
+    "weekdaysOnly": true
+  },
+  {
+    "id": 3,
+    "name": "Intel Neo – Edit",
+    "start": "2026-06-17",
+    "end": "2026-06-22",
+    "color": "purple",
+    "notes": "",
+    "weekdaysOnly": true
+  },
+  {
+    "id": 4,
+    "name": "Intel Neo – Resizing: 9x16, 16x9, 4x5, 1x1",
+    "start": "2026-06-23",
+    "end": "2026-06-29",
+    "color": "purple",
+    "notes": "",
+    "weekdaysOnly": true
+  },
+  {
+    "id": 5,
+    "name": "Intel Neo – Localization x8 (UK, DE, IT, FR, JP + AU + CN + IN)",
+    "start": "2026-07-06",
+    "end": "2026-07-10",
+    "color": "purple",
+    "notes": "",
+    "weekdaysOnly": false
+  },
+  {
+    "id": 7,
+    "name": "Intel Neo – Renaming + Final QC/QA",
+    "start": "2026-06-30",
+    "end": "2026-07-01",
+    "color": "purple",
+    "notes": "",
+    "weekdaysOnly": false
+  },
+  {
+    "id": 8,
+    "name": "Intel Neo – Traffic EOD",
+    "start": "2026-07-02",
+    "end": "2026-07-02",
+    "color": "purple",
+    "notes": "",
+    "weekdaysOnly": false
+  },
+  {
+    "id": 9,
+    "name": "Windows Holiday – Product Marketing Brief",
+    "start": "2026-06-20",
+    "end": "2026-06-20",
+    "color": "green"
+  },
+  {
+    "id": 10,
+    "name": "Windows Holiday – Agency Brief",
+    "start": "2026-06-26",
+    "end": "2026-06-26",
+    "color": "green"
+  },
+  {
+    "id": 11,
+    "name": "Windows Holiday – Strategic Development",
+    "start": "2026-07-01",
+    "end": "2026-07-01",
+    "color": "green"
+  },
+  {
+    "id": 12,
+    "name": "Windows Holiday – Approve Creative Strategy",
+    "start": "2026-07-12",
+    "end": "2026-07-12",
+    "color": "green"
+  },
+  {
+    "id": 13,
+    "name": "Windows Holiday – Creative Territory Development",
+    "start": "2026-07-15",
+    "end": "2026-08-02",
+    "color": "green"
+  },
+  {
+    "id": 14,
+    "name": "Windows Holiday – Creative Territory Presentation",
+    "start": "2026-08-09",
+    "end": "2026-08-09",
+    "color": "green"
+  },
+  {
+    "id": 15,
+    "name": "Windows Holiday – Creative Territory Presentation",
+    "start": "2026-08-12",
+    "end": "2026-08-12",
+    "color": "green"
+  },
+  {
+    "id": 16,
+    "name": "Windows Holiday – Build out all assets by channel",
+    "start": "2026-08-12",
+    "end": "2026-08-16",
+    "color": "green"
+  },
+  {
+    "id": 17,
+    "name": "Windows Holiday – Approve Scripts for Transcreation/Production",
+    "start": "2026-08-23",
+    "end": "2026-08-23",
+    "color": "green"
+  },
+  {
+    "id": 18,
+    "name": "Windows Holiday – Stakeholder & Partner Reviews",
+    "start": "2026-08-26",
+    "end": "2026-08-28",
+    "color": "green"
+  },
+  {
+    "id": 19,
+    "name": "Windows Holiday – Shoot Prep",
+    "start": "2026-09-10",
+    "end": "2026-09-22",
+    "color": "green"
+  },
+  {
+    "id": 20,
+    "name": "Windows Holiday – Shoot Window & Digital Asset Production",
+    "start": "2026-09-23",
+    "end": "2026-09-27",
+    "color": "green"
+  },
+  {
+    "id": 21,
+    "name": "Windows Holiday – Editorial",
+    "start": "2026-09-27",
+    "end": "2026-10-07",
+    "color": "green"
+  },
+  {
+    "id": 22,
+    "name": "Windows Holiday – Exec Rough Cut Review",
+    "start": "2026-10-07",
+    "end": "2026-10-07",
+    "color": "green"
+  },
+  {
+    "id": 23,
+    "name": "Windows Holiday – Campaign Live – US",
+    "start": "2026-10-27",
+    "end": "2026-10-27",
+    "color": "green"
+  },
+  {
+    "id": 24,
+    "name": "Windows Holiday – Campaign Live – ROW",
+    "start": "2026-10-27",
+    "end": "2026-10-27",
+    "color": "green"
+  },
+  {
+    "id": 25,
+    "name": "Windows Holiday – Campaign Live – US",
+    "start": "2026-11-04",
+    "end": "2026-11-04",
+    "color": "green"
+  },
+  {
+    "id": 26,
+    "name": "Windows Holiday – Linear Live Japan",
+    "start": "2026-11-18",
+    "end": "2026-11-18",
+    "color": "green"
+  },
+  {
+    "id": 27,
+    "name": "M365 – Existing Q3 & Q4 Creative",
+    "start": "2026-07-01",
+    "end": "2026-09-30",
+    "color": "blue"
+  },
+  {
+    "id": 28,
+    "name": "OOO – Christian Heilman",
+    "start": "2026-06-14",
+    "end": "2026-06-15",
+    "color": "charcoal"
+  },
+  {
+    "id": 29,
+    "name": "OOO – Christian Heilman",
+    "start": "2026-07-13",
+    "end": "2026-07-21",
+    "color": "charcoal"
+  },
+  {
+    "id": 30,
+    "name": "OOO – Christian Heilman",
+    "start": "2026-08-23",
+    "end": "2026-08-29",
+    "color": "charcoal"
+  },
+  {
+    "id": 31,
+    "name": "OOO – Jake Johnson",
+    "start": "2026-06-04",
+    "end": "2026-06-07",
+    "color": "charcoal"
+  },
+  {
+    "id": 32,
+    "name": "OOO – Jake Johnson",
+    "start": "2026-07-01",
+    "end": "2026-07-05",
+    "color": "charcoal"
+  },
+  {
+    "id": 33,
+    "name": "OOO – Jake Johnson",
+    "start": "2026-08-03",
+    "end": "2026-08-07",
+    "color": "charcoal"
+  },
+  {
+    "id": 34,
+    "name": "OOO – Dana Cataldo",
+    "start": "2026-06-20",
+    "end": "2026-06-21",
+    "color": "charcoal"
+  },
+  {
+    "id": 35,
+    "name": "OOO – Dana Cataldo",
+    "start": "2026-07-15",
+    "end": "2026-07-24",
+    "color": "charcoal"
+  },
+  {
+    "id": 36,
+    "name": "OOO – Dana Cataldo",
+    "start": "2026-08-23",
+    "end": "2026-09-07",
+    "color": "charcoal"
+  },
+  {
+    "id": 37,
+    "name": "OOO – Hackett",
+    "start": "2026-06-05",
+    "end": "2026-06-05",
+    "color": "charcoal"
+  },
+  {
+    "id": 38,
+    "name": "OOO – Hackett",
+    "start": "2026-06-22",
+    "end": "2026-06-22",
+    "color": "charcoal"
+  },
+  {
+    "id": 45,
+    "name": "Silicone Edit",
+    "start": "2026-07-13",
+    "end": "2026-08-14",
+    "color": "purple2",
+    "notes": "",
+    "weekdaysOnly": true
+  },
+  {
+    "id": 39,
+    "name": "M365 – Marcel World Cup",
+    "start": "2026-06-09",
+    "end": "2026-06-16",
+    "color": "blue2"
+  },
+  {
+    "id": 40,
+    "name": "Windows BTS – Legal",
+    "start": "2026-06-02",
+    "end": "2026-06-06",
+    "color": "green"
+  },
+  {
+    "id": 41,
+    "name": "Windows BTS – Legal",
+    "start": "2026-06-09",
+    "end": "2026-06-09",
+    "color": "green"
+  },
+  {
+    "id": 42,
+    "name": "Windows BTS – Catch the Deal | Magic Switch",
+    "start": "2026-06-17",
+    "end": "2026-06-19",
+    "color": "green"
+  },
+  {
+    "id": 43,
+    "name": "Windows BTS – Catch the Deal | Magic Switch",
+    "start": "2026-06-22",
+    "end": "2026-06-24",
+    "color": "green"
+  },
+  {
+    "id": 44,
+    "name": "Lucid Link – Changeover",
+    "start": "2026-07-03",
+    "end": "2026-07-06",
+    "color": "orange"
+  }
+];
+const DEFAULT_NEXT_ID = 46;
+const STORAGE_KEY = 'prodcal_events_v1';
+const STORAGE_ID_KEY = 'prodcal_nextid_v1';
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    localStorage.setItem(STORAGE_ID_KEY, String(nextId));
+    const el = document.getElementById('save-indicator');
+    if (el) {
+      el.textContent = '✓ saved';
+      el.style.color = '#4a9';
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.textContent = ''; }, 2000);
+    }
+  } catch(e) {}
+}
+
+function loadData() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const savedId = localStorage.getItem(STORAGE_ID_KEY);
+    if (saved) {
+      events = JSON.parse(saved);
+      nextId = savedId ? parseInt(savedId) : DEFAULT_NEXT_ID;
+      return;
+    }
+  } catch(e) {}
+  events = JSON.parse(JSON.stringify(DEFAULT_EVENTS));
+  nextId = DEFAULT_NEXT_ID;
+}
+
+loadData();
+let events_ref = events; // keep reference
+
+// ── Date helpers ──────────────────────────────────────────────
+function ymd(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function toStr(dt) {
+  return dt.getFullYear() + '-' +
+    String(dt.getMonth()+1).padStart(2,'0') + '-' +
+    String(dt.getDate()).padStart(2,'0');
+}
+function addDays(s, n) {
+  const d = ymd(s); d.setDate(d.getDate()+n); return toStr(d);
+}
+function daysBetween(a, b) {
+  return Math.round((ymd(b) - ymd(a)) / 86400000);
+}
+function todayStr() { return toStr(new Date()); }
+function fmtRange(s, e) {
+  const sd = ymd(s), ed = ymd(e);
+  if (s===e) return `${MON_SHORT[sd.getMonth()]} ${sd.getDate()}, ${sd.getFullYear()}`;
+  if (sd.getMonth()===ed.getMonth()) return `${MON_SHORT[sd.getMonth()]} ${sd.getDate()}–${ed.getDate()}, ${sd.getFullYear()}`;
+  return `${MON_SHORT[sd.getMonth()]} ${sd.getDate()} – ${MON_SHORT[ed.getMonth()]} ${ed.getDate()}, ${sd.getFullYear()}`;
+}
+
+// ── Layout constants (must match CSS vars) ────────────────────
+const BAR_H   = 18;
+const BAR_GAP = 2;
+const DAY_NUM_H = 20;
+const CELL_PAD  = 2;
+
+// ── Render ────────────────────────────────────────────────────
+function render() {
+  document.getElementById('month-label').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+  const weeksEl = document.getElementById('cal-weeks');
+  weeksEl.innerHTML = '';
+
+  const firstDow   = new Date(currentYear, currentMonth, 1).getDay(); // 0=Sun
+  const daysInMon  = new Date(currentYear, currentMonth+1, 0).getDate();
+  const today      = todayStr();
+
+  // Build weeks array: each week = array of 7 date strings
+  const weeks = [];
+  let week = [];
+
+  // Fill leading days from prev month
+  const prevMonDays = new Date(currentYear, currentMonth, 0).getDate();
+  for (let i = 0; i < firstDow; i++) {
+    const prevM = currentMonth === 0 ? 11 : currentMonth-1;
+    const prevY = currentMonth === 0 ? currentYear-1 : currentYear;
+    const d = prevMonDays - firstDow + i + 1;
+    week.push({ date: toStr(new Date(prevY, prevM, d)), other: true });
+  }
+
+  for (let d = 1; d <= daysInMon; d++) {
+    week.push({ date: toStr(new Date(currentYear, currentMonth, d)), other: false });
+    if (week.length === 7) { weeks.push(week); week = []; }
+  }
+
+  // Trailing days
+  if (week.length > 0) {
+    const nextM = currentMonth === 11 ? 0 : currentMonth+1;
+    const nextY = currentMonth === 11 ? currentYear+1 : currentYear;
+    let nd = 1;
+    while (week.length < 7) {
+      week.push({ date: toStr(new Date(nextY, nextM, nd++)), other: true });
+    }
+    weeks.push(week);
+  }
+
+  // Collect all events visible in this month view
+  const viewStart = weeks[0][0].date;
+  const viewEnd   = weeks[weeks.length-1][6].date;
+
+  const visibleEvents = events
+    .filter(ev => ev.start <= viewEnd && ev.end >= viewStart)
+    .filter(ev => !activeFilter || ev.color === activeFilter)
+    .sort((a,b) => daysBetween(b.start,b.end) - daysBetween(a.start,a.end));
+
+  // Render each week row
+  weeks.forEach((weekDays, wi) => {
+    const weekEl = document.createElement('div');
+    weekEl.className = 'week-row';
+
+    const weekStart = weekDays[0].date;
+    const weekEnd   = weekDays[6].date;
+
+    // Find events that overlap this week
+    const weekEvents = visibleEvents.filter(ev => ev.end >= weekStart && ev.start <= weekEnd);
+
+    // Assign slots per-week greedily: find lowest slot not occupied by an overlapping event
+    const weekSlotMap = {}; // eventId -> slot for this week
+    const slotOccupied = []; // slot -> array of [segStart, segEnd] date strings
+
+    weekEvents.forEach(ev => {
+      const segStart = ev.start < weekStart ? weekStart : ev.start;
+      const segEnd   = ev.end   > weekEnd   ? weekEnd   : ev.end;
+      // Find lowest slot where no existing occupant overlaps [segStart, segEnd]
+      let slot = 0;
+      while (true) {
+        const occupants = slotOccupied[slot] || [];
+        const conflicts = occupants.some(([os, oe]) => segStart <= oe && segEnd >= os);
+        if (!conflicts) break;
+        slot++;
+      }
+      weekSlotMap[ev.id] = slot;
+      if (!slotOccupied[slot]) slotOccupied[slot] = [];
+      slotOccupied[slot].push([segStart, segEnd]);
+    });
+
+    const maxSlot = weekEvents.length > 0
+      ? Math.max(...weekEvents.map(ev => weekSlotMap[ev.id]))
+      : -1;
+
+    const cellHeight = 130;
+    weekEl.style.height = cellHeight + 'px';
+    weekEl.style.minHeight = cellHeight + 'px';
+    weekEl.style.maxHeight = cellHeight + 'px';
+    weekEl.style.overflow = 'hidden';
+
+    // Day cells
+    weekDays.forEach((dayObj, di) => {
+      const cell = document.createElement('div');
+      cell.className = 'day-cell';
+      if (di === 0 || di === 6) cell.classList.add('weekend');
+      if (dayObj.other) cell.classList.add('other-month');
+      if (dayObj.date === today) cell.classList.add('today');
+      if (dayObj.date < today) cell.classList.add('past');
+      cell.dataset.date = dayObj.date;
+
+      const num = document.createElement('div');
+      num.className = 'day-num';
+      num.textContent = parseInt(dayObj.date.split('-')[2]);
+      cell.appendChild(num);
+
+      // Drop target
+      cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('drop-target'); });
+      cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
+      cell.addEventListener('drop', e => {
+        e.preventDefault();
+        cell.classList.remove('drop-target');
+        if (isLocked) return;
+        const id     = parseInt(e.dataTransfer.getData('evId'));
+        const offset = parseInt(e.dataTransfer.getData('offset'));
+        const ev = events.find(x => x.id === id);
+        if (!ev) return;
+        const span = daysBetween(ev.start, ev.end);
+        ev.start = addDays(dayObj.date, -offset);
+        ev.end   = addDays(ev.start, span);
+        saveData();
+        render();
+      });
+
+      weekEl.appendChild(cell);
+    });
+
+    // Bars layer — absolutely positioned over all 7 cells in this week
+    const barsLayer = document.createElement('div');
+    barsLayer.className = 'bars-layer';
+    weekEl.appendChild(barsLayer);
+
+    // Compute cell width as percentage (7 equal cols)
+    const colW = 100 / 7; // percent
+
+    // Draw each event that overlaps this week
+    weekEvents.forEach(ev => {
+      if (ev.end < weekStart || ev.start > weekEnd) return;
+
+      const segStart = ev.start < weekStart ? weekStart : ev.start;
+      const segEnd   = ev.end   > weekEnd   ? weekEnd   : ev.end;
+      const slot = weekSlotMap[ev.id];
+      const top  = slot * (BAR_H + BAR_GAP);
+
+      // If weekdays only, split into consecutive weekday runs within this week segment
+      // Column 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+      const segments = [];
+      if (ev.weekdaysOnly) {
+        let runStart = null;
+        let runEnd   = null;
+        weekDays.forEach((dayObj, di) => {
+          const isWeekday = di >= 1 && di <= 5; // col 1=Mon through col 5=Fri
+          const inRange   = dayObj.date >= segStart && dayObj.date <= segEnd;
+          if (inRange && isWeekday) {
+            if (runStart === null) runStart = di;
+            runEnd = di;
+          } else {
+            if (runStart !== null) {
+              segments.push([runStart, runEnd]);
+              runStart = null;
+              runEnd   = null;
+            }
+          }
+        });
+        if (runStart !== null) segments.push([runStart, runEnd]);
+      } else {
+        const startCol = weekDays.findIndex(d => d.date === segStart);
+        const endCol   = weekDays.findIndex(d => d.date === segEnd);
+        if (startCol !== -1 && endCol !== -1) segments.push([startCol, endCol]);
+      }
+
+      segments.forEach(([startCol, endCol], si) => {
+        if (startCol === -1 || endCol === -1 || endCol < startCol) return;
+
+        const leftPct  = startCol * colW;
+        const widthPct = (endCol - startCol + 1) * colW;
+
+        const bar = document.createElement('div');
+        bar.className = `event-bar ${ev.color}`;
+        // For custom jobs, apply hex directly since no CSS class exists
+        if (ev.color.startsWith('custom_')) {
+          const job = getJobByKey(ev.color);
+          bar.style.background = job.hex;
+          bar.style.color = '#fff';
+        }
+        bar.dataset.id = ev.id;
+        bar.style.left   = `calc(${leftPct}% + 3px)`;
+        bar.style.width  = `calc(${widthPct}% - 6px)`;
+        bar.style.top    = top + 'px';
+        bar.style.height = BAR_H + 'px';
+
+        // Show label only on the very first segment of the first week
+        const isFirstSeg = si === 0 && segStart === (ev.start < weekStart ? weekStart : ev.start) && weekStart <= ev.start || (si === 0 && ev.start >= weekStart && segStart === ev.start);
+        bar.textContent = (segStart === ev.start && si === 0) ? ev.name : '';
+
+        bar.addEventListener('mouseenter', e => showTooltip(e, ev));
+        bar.addEventListener('mousemove', moveTooltip);
+        bar.addEventListener('mouseleave', hideTooltip);
+        bar.addEventListener('click', () => { if (!isLocked) openEdit(ev.id); });
+        bar.addEventListener('contextmenu', e => { e.preventDefault(); if (!isLocked) showDeleteConfirm(e, ev.id); });
+
+        bar.draggable = !isLocked;
+        bar.addEventListener('dragstart', e => {
+          const offset = daysBetween(ev.start, segStart);
+          e.dataTransfer.setData('evId', ev.id);
+          e.dataTransfer.setData('offset', offset);
+          setTimeout(() => bar.classList.add('dragging'), 0);
+        });
+        bar.addEventListener('dragend', () => bar.classList.remove('dragging'));
+
+        barsLayer.appendChild(bar);
+      }); // end segments.forEach
+    }); // end weekEvents.forEach
+
+    weeksEl.appendChild(weekEl);
+  });
+}
+
+// ── Tooltip ───────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, ev) {
+  document.getElementById('tt-label').textContent = ev.name;
+  document.getElementById('tt-date').textContent  = fmtRange(ev.start, ev.end);
+  const notesEl = document.getElementById('tt-notes');
+  notesEl.textContent = ev.notes || '';
+  notesEl.style.display = ev.notes ? 'block' : 'none';
+  tooltip.classList.add('visible');
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+// ── Delete confirm popup ──────────────────────────────────────
+const deleteConfirm = document.getElementById('delete-confirm');
+let deleteTargetId = null;
+function showDeleteConfirm(e, id) {
+  hideTooltip();
+  deleteTargetId = id;
+  const ev = events.find(x => x.id === id);
+  document.getElementById('dc-name').textContent = `Delete "${ev.name}"?`;
+  deleteConfirm.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+  deleteConfirm.style.top  = Math.min(e.clientY, window.innerHeight - 80) + 'px';
+  deleteConfirm.classList.add('visible');
+}
+document.getElementById('dc-yes').addEventListener('click', () => {
+  events = events.filter(x => x.id !== deleteTargetId);
+  deleteConfirm.classList.remove('visible');
+  saveData();
+  render();
+});
+document.getElementById('dc-no').addEventListener('click', () => deleteConfirm.classList.remove('visible'));
+document.addEventListener('click', e => {
+  if (!deleteConfirm.contains(e.target)) deleteConfirm.classList.remove('visible');
+});
+
+// ── Modal ─────────────────────────────────────────────────────
+const modal = document.getElementById('modal');
+// ── Job registry ──────────────────────────────────────────────
+const JOBS_KEY = 'prodcal_jobs_v1';
+const DEFAULT_JOBS = [
+  { key: 'purple',  name: 'Intel Neo',          hex: '#7B2FBE' },
+  { key: 'purple2', name: 'Silicone Edit',       hex: '#B39DDB' },
+  { key: 'green',   name: 'Windows Holiday',     hex: '#2E7D32' },
+  { key: 'blue2',   name: 'M365 (confirmed)',    hex: '#1565C0' },
+  { key: 'blue',    name: 'M365 (pending)',       hex: 'rgba(21,101,192,0.35)' },
+  { key: 'charcoal',name: 'OOO',                 hex: '#3a3835' },
+  { key: 'orange',  name: 'Lucid Link',          hex: '#E65100' },
+];
+
+function loadJobs() {
+  try {
+    const saved = localStorage.getItem(JOBS_KEY);
+    return saved ? JSON.parse(saved) : [...DEFAULT_JOBS];
+  } catch(e) { return [...DEFAULT_JOBS]; }
+}
+function saveJobs(jobs) {
+  localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
+}
+
+let jobRegistry = loadJobs();
+
+function getJobByKey(key) {
+  return jobRegistry.find(j => j.key === key) || { key, name: key, hex: '#888' };
+}
+function getJobHex(key) { return getJobByKey(key).hex; }
+
+function renderJobPicker(selectedKey) {
+  const picker = document.getElementById('job-picker');
+  picker.innerHTML = '';
+  jobRegistry.forEach(job => {
+    const sw = document.createElement('div');
+    sw.className = 'job-swatch' + (job.key === selectedKey ? ' selected' : '');
+    sw.style.background = job.hex;
+    // Dark text for light colors
+    const isLight = job.hex.includes('0.35') || job.hex === '#B39DDB';
+    sw.style.color = isLight ? '#1a1a1a' : '#fff';
+    sw.textContent = job.name;
+    sw.addEventListener('click', () => {
+      document.getElementById('ev-color').value = job.key;
+      document.querySelectorAll('.job-swatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected');
+    });
+    picker.appendChild(sw);
+  });
+  document.getElementById('ev-color').value = selectedKey || jobRegistry[0].key;
+}
+
+document.getElementById('new-job-add-btn').addEventListener('click', () => {
+  const nameEl  = document.getElementById('new-job-name');
+  const colorEl = document.getElementById('new-job-color');
+  const name = nameEl.value.trim();
+  if (!name) { nameEl.focus(); return; }
+  const hex = colorEl.value;
+  const key = 'custom_' + Date.now();
+  jobRegistry.push({ key, name, hex });
+  saveJobs(jobRegistry);
+  nameEl.value = '';
+  renderJobPicker(key);
+  // Also update legend bar
+  updateLegendBar();
+});
+
+function updateLegendBar() {
+  const bar = document.querySelector('.legend-bar');
+  // Remove old swatches (keep label and lock btn)
+  bar.querySelectorAll('.filter-item').forEach(el => el.remove());
+  const lockDiv = bar.querySelector('div[style]');
+  jobRegistry.forEach(job => {
+    const item = document.createElement('div');
+    item.className = 'legend-item filter-item';
+    item.dataset.color = job.key;
+    item.innerHTML = `<div class="legend-dot" style="background:${job.hex}"></div>${job.name}`;
+    item.addEventListener('click', () => {
+      const color = item.dataset.color;
+      if (activeFilter === color) {
+        activeFilter = null;
+        document.querySelectorAll('.filter-item').forEach(i => i.classList.remove('active','dimmed'));
+      } else {
+        activeFilter = color;
+        document.querySelectorAll('.filter-item').forEach(i => {
+          i.classList.toggle('active', i.dataset.color === color);
+          i.classList.toggle('dimmed', i.dataset.color !== color);
+        });
+      }
+      render();
+    });
+    bar.insertBefore(item, lockDiv);
+  });
+}
+function openEdit(id) {
+  editingId = id;
+  const ev = events.find(x => x.id === id);
+  document.getElementById('modal-title').textContent = 'Edit event';
+  document.getElementById('ev-name').value  = ev.name;
+  document.getElementById('ev-start').value = ev.start;
+  document.getElementById('ev-end').value   = ev.end;
+  document.getElementById('ev-end').min     = todayStr();
+  renderJobPicker(ev.color);
+  document.getElementById('ev-notes').value = ev.notes || '';
+  document.getElementById('ev-weekdays-only').checked = ev.weekdaysOnly || false;
+  document.getElementById('modal-delete').style.display = 'inline-flex';
+  modal.classList.add('open');
+}
+function openAdd() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Add event';
+  document.getElementById('ev-name').value  = '';
+  const t = todayStr();
+  document.getElementById('ev-start').value = t;
+  document.getElementById('ev-end').value   = t;
+  document.getElementById('ev-end').min     = t;
+  renderJobPicker(jobRegistry[0].key);
+  document.getElementById('ev-notes').value = '';
+  document.getElementById('ev-weekdays-only').checked = false;
+  document.getElementById('modal-delete').style.display = 'none';
+  modal.classList.add('open');
+}
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+document.getElementById('modal-cancel').addEventListener('click', () => modal.classList.remove('open'));
+document.getElementById('modal-save').addEventListener('click', () => {
+  const name         = document.getElementById('ev-name').value.trim();
+  const start        = document.getElementById('ev-start').value;
+  const end          = document.getElementById('ev-end').value;
+  const color        = document.getElementById('ev-color').value;
+  const notes        = document.getElementById('ev-notes').value.trim();
+  const weekdaysOnly = document.getElementById('ev-weekdays-only').checked;
+  if (!name || !start || !end || end < start) return;
+  if (editingId) {
+    const ev = events.find(x => x.id === editingId);
+    Object.assign(ev, { name, start, end, color, notes, weekdaysOnly });
+  } else {
+    events.push({ id: nextId++, name, start, end, color, notes, weekdaysOnly });
+  }
+  modal.classList.remove('open');
+  saveData();
+  render();
+});
+document.getElementById('modal-delete').addEventListener('click', () => {
+  events = events.filter(x => x.id !== editingId);
+  modal.classList.remove('open');
+  saveData();
+  render();
+});
+
+document.getElementById('add-btn').addEventListener('click', openAdd);
+
+// ── Export ────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  const payload = JSON.stringify({ events, nextId }, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `production-calendar-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── Import ────────────────────────────────────────────────────
+
+
+document.getElementById('prev-btn').addEventListener('click', () => {
+  if (--currentMonth < 0) { currentMonth = 11; currentYear--; }
+  render(); loadNotes();
+});
+document.getElementById('next-btn').addEventListener('click', () => {
+  if (++currentMonth > 11) { currentMonth = 0; currentYear++; }
+  render(); loadNotes();
+});
+
+// ── Per-month notes ───────────────────────────────────────────
+const NOTES_PREFIX = 'prodcal_notes_month_';
+
+function monthNotesKey() {
+  return `${NOTES_PREFIX}${currentYear}_${currentMonth}`;
+}
+
+function saveNotes() {
+  localStorage.setItem(monthNotesKey(), JSON.stringify(notesList));
+  const el = document.getElementById('notes-saved');
+  el.textContent = '✓ saved';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.textContent = '', 2000);
+}
+
+function renderNotes() {
+  // Update header to show which month
+  document.getElementById('notes-title').textContent =
+    `${MONTHS[currentMonth]} ${currentYear} Notes`;
+  const ul = document.getElementById('notes-list');
+  ul.innerHTML = '';
+  notesList.forEach((text, i) => {
+    const li = document.createElement('li');
+    const span = document.createElement('span');
+    span.className = 'note-text';
+    span.textContent = text;
+    const del = document.createElement('button');
+    del.className = 'note-delete';
+    del.textContent = '×';
+    del.title = 'Delete note';
+    del.addEventListener('click', () => {
+      notesList.splice(i, 1);
+      saveNotes();
+      renderNotes();
+    });
+    li.appendChild(span);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+}
+
+function loadNotes() {
+  try {
+    const saved = localStorage.getItem(monthNotesKey());
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      notesList = Array.isArray(parsed) ? parsed : [];
+    } else {
+      notesList = [];
+    }
+  } catch(e) { notesList = []; }
+  renderNotes();
+}
+
+document.getElementById('notes-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (!val) return;
+    notesList.push(val);
+    e.target.value = '';
+    saveNotes();
+    renderNotes();
+  }
+});
+
+// ── Filter by job ─────────────────────────────────────────────
+let activeFilter = null;
+
+document.querySelectorAll('.filter-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const color = item.dataset.color;
+    if (activeFilter === color) {
+      activeFilter = null;
+      document.querySelectorAll('.filter-item').forEach(i => i.classList.remove('active','dimmed'));
+    } else {
+      activeFilter = color;
+      document.querySelectorAll('.filter-item').forEach(i => {
+        i.classList.toggle('active', i.dataset.color === color);
+        i.classList.toggle('dimmed', i.dataset.color !== color);
+      });
+    }
+    render();
+  });
+});
+
+// ── Lock / unlock editing ─────────────────────────────────────
+const EDIT_PASSWORD = 'tag2026';
+const LOCK_KEY = 'prodcal_locked_v1';
+let isLocked = localStorage.getItem(LOCK_KEY) !== 'unlocked';
+
+function applyLockState() {
+  const btn = document.getElementById('lock-btn');
+  if (isLocked) {
+    document.body.classList.add('view-only');
+    btn.textContent = '🔒 Locked';
+    btn.classList.remove('unlocked');
+    btn.title = 'Click to unlock editing';
+  } else {
+    document.body.classList.remove('view-only');
+    btn.textContent = '🔓 Editing';
+    btn.classList.add('unlocked');
+    btn.title = 'Click to lock';
+  }
+}
+
+document.getElementById('lock-btn').addEventListener('click', () => {
+  if (isLocked) {
+    const pwd = prompt('Enter password to unlock editing:');
+    if (pwd === EDIT_PASSWORD) {
+      isLocked = false;
+      localStorage.setItem(LOCK_KEY, 'unlocked');
+      applyLockState();
+    } else if (pwd !== null) {
+      alert('Incorrect password.');
+    }
+  } else {
+    isLocked = true;
+    localStorage.setItem(LOCK_KEY, 'locked');
+    applyLockState();
+  }
+});
+
+applyLockState();
+updateLegendBar();
+
+// Pre-load July 2026 notes if not already set
+(function() {
+  const julyKey = 'prodcal_notes_month_2026_6';
+  if (!localStorage.getItem(julyKey)) {
+    const julyNotes = [
+      'M365 – Existing Q3/Q4 Creative: runs 7/7–9/1. Unknown but potential for ancillary requests dependent on Publicis media plan (ie. new platform exports, new CTA, updated legal)',
+      'Silicone Edit – Unknown dates. Figures net new creative. Dates allow for creative dev, initial edit, versioning and localization changes'
+    ];
+    localStorage.setItem(julyKey, JSON.stringify(julyNotes));
+  }
+})();
+
+render();
+loadNotes();
+</script>
+</body>
+</html>
