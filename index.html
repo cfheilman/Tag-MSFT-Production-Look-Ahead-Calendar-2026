@@ -82,9 +82,9 @@
     border-right: 1px solid var(--border);
     background: var(--surface);
     position: relative;
-    height: 130px;
-    min-height: 130px;
-    max-height: 130px;
+    height: 150px;
+    min-height: 150px;
+    max-height: 150px;
     overflow: hidden;
   }
   .day-cell:last-child { border-right: none; }
@@ -702,9 +702,11 @@ const DEFAULT_EVENTS = [
   {
     "id": 28,
     "name": "OOO – Christian Heilman",
-    "start": "2026-06-14",
-    "end": "2026-06-15",
-    "color": "charcoal"
+    "start": "2026-06-13",
+    "end": "2026-06-14",
+    "color": "charcoal",
+    "notes": "",
+    "weekdaysOnly": false
   },
   {
     "id": 29,
@@ -789,22 +791,28 @@ const DEFAULT_EVENTS = [
     "id": 39,
     "name": "M365 – Marcel World Cup",
     "start": "2026-06-09",
-    "end": "2026-06-16",
-    "color": "blue2"
+    "end": "2026-06-19",
+    "color": "blue2",
+    "notes": "",
+    "weekdaysOnly": false
   },
   {
     "id": 40,
     "name": "Windows BTS – Legal",
     "start": "2026-06-02",
-    "end": "2026-06-06",
-    "color": "green"
+    "end": "2026-06-05",
+    "color": "green",
+    "notes": "",
+    "weekdaysOnly": false
   },
   {
     "id": 41,
     "name": "Windows BTS – Legal",
-    "start": "2026-06-09",
+    "start": "2026-06-08",
     "end": "2026-06-09",
-    "color": "green"
+    "color": "green",
+    "notes": "",
+    "weekdaysOnly": false
   },
   {
     "id": 42,
@@ -826,16 +834,64 @@ const DEFAULT_EVENTS = [
     "start": "2026-07-03",
     "end": "2026-07-06",
     "color": "orange"
+  },
+  {
+    "id": 46,
+    "name": "M365 - Omnibus Excel",
+    "start": "2026-06-22",
+    "end": "2026-06-26",
+    "color": "blue2",
+    "notes": "",
+    "weekdaysOnly": true
+  },
+  {
+    "id": 47,
+    "name": "M365 - Omnibus Anthem",
+    "start": "2026-06-29",
+    "end": "2026-07-07",
+    "color": "blue2",
+    "notes": "",
+    "weekdaysOnly": true
+  },
+  {
+    "id": 48,
+    "name": "OOO - Troy Buckley",
+    "start": "2026-06-13",
+    "end": "2026-06-14",
+    "color": "charcoal",
+    "notes": "",
+    "weekdaysOnly": false
+  },
+  {
+    "id": 49,
+    "name": "OOO - Hannah DavisLaw",
+    "start": "2026-07-15",
+    "end": "2026-07-15",
+    "color": "charcoal",
+    "notes": "",
+    "weekdaysOnly": false
+  },
+  {
+    "id": 50,
+    "name": "OOO - Mike Ritchie",
+    "start": "2026-07-16",
+    "end": "2026-07-23",
+    "color": "charcoal",
+    "notes": "",
+    "weekdaysOnly": true
   }
 ];
-const DEFAULT_NEXT_ID = 46;
-const STORAGE_KEY = 'prodcal_events_v1';
-const STORAGE_ID_KEY = 'prodcal_nextid_v1';
+const DEFAULT_NEXT_ID = 51;
+const DATA_VERSION = '2026-06-08-v1'; // bump this with every new bake
+const STORAGE_KEY     = 'prodcal_events_v1';
+const STORAGE_ID_KEY  = 'prodcal_nextid_v1';
+const VERSION_KEY     = 'prodcal_data_version';
 
 function saveData() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
     localStorage.setItem(STORAGE_ID_KEY, String(nextId));
+    localStorage.setItem(VERSION_KEY, DATA_VERSION);
     const el = document.getElementById('save-indicator');
     if (el) {
       el.textContent = '✓ saved';
@@ -848,16 +904,24 @@ function saveData() {
 
 function loadData() {
   try {
+    const storedVersion = localStorage.getItem(VERSION_KEY);
     const saved = localStorage.getItem(STORAGE_KEY);
-    const savedId = localStorage.getItem(STORAGE_ID_KEY);
-    if (saved) {
+    // If version matches and we have saved data, use it (includes user's browser edits)
+    if (saved && storedVersion === DATA_VERSION) {
       events = JSON.parse(saved);
-      nextId = savedId ? parseInt(savedId) : DEFAULT_NEXT_ID;
+      nextId = parseInt(localStorage.getItem(STORAGE_ID_KEY)) || DEFAULT_NEXT_ID;
       return;
     }
   } catch(e) {}
+  // Version mismatch or no saved data — load fresh baked defaults
   events = JSON.parse(JSON.stringify(DEFAULT_EVENTS));
   nextId = DEFAULT_NEXT_ID;
+  // Save so subsequent loads within this version use localStorage
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    localStorage.setItem(STORAGE_ID_KEY, String(nextId));
+    localStorage.setItem(VERSION_KEY, DATA_VERSION);
+  } catch(e) {}
 }
 
 loadData();
@@ -976,7 +1040,7 @@ function render() {
       ? Math.max(...weekEvents.map(ev => weekSlotMap[ev.id]))
       : -1;
 
-    const cellHeight = 130;
+    const cellHeight = 150;
     weekEl.style.height = cellHeight + 'px';
     weekEl.style.minHeight = cellHeight + 'px';
     weekEl.style.maxHeight = cellHeight + 'px';
